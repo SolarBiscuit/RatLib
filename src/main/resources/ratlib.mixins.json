@@ -6,6 +6,8 @@
   "refmap": "ratlib.refmap.json",
     "mixins": [
         "InventoryMixin",
+        "PolymorphRecipeDataMixin",
+        "ServerGamePacketListenerImplMixin",
         "SlotMixin"
     ],
   "injectors": {

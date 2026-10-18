@@ -34,7 +34,9 @@ build/
 
 # Local Maven publish output
 mcmodsrepo/
-
+reviews/
+branding/
+PatchNotes.txt
 # Forge / Minecraft run dirs
 run/
 run-data/
