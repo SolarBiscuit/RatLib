@@ -21,42 +21,60 @@ import java.util.function.DoubleSupplier;
 
 /**
  * Registry of per-mob config specs. Empty unless a content mod registers entries.
+ * Content mods register from their constructors, which Forge runs in parallel, so writes are
+ * copy-on-write and reads never lock.
  */
 public final class MobConfigs {
-    private static final Map<ResourceLocation, MobSettingsSpec> BY_TYPE = new LinkedHashMap<>();
-    private static DoubleSupplier rooftopRejectChance = () -> 0.0D;
+    private static volatile Map<ResourceLocation, MobSettingsSpec> byType = Map.of();
+    private static volatile Map<String, DoubleSupplier> rooftopByNamespace = Map.of();
+    private static volatile DoubleSupplier rooftopRejectChance = () -> 0.0D;
 
     private MobConfigs() {}
 
-    public static void register(MobSettingsSpec spec) {
-        BY_TYPE.put(spec.typeId, spec);
+    public static synchronized void register(MobSettingsSpec spec) {
+        Map<ResourceLocation, MobSettingsSpec> next = new LinkedHashMap<>(byType);
+        next.put(spec.typeId, spec);
+        byType = Collections.unmodifiableMap(next);
     }
 
+    /** Fallback for mobs whose mod has not set its own chance. Prefer the namespaced overload. */
     public static void setRooftopRejectChance(DoubleSupplier chance) {
         rooftopRejectChance = chance;
+    }
+
+    /** Rooftop reject chance for every mob registered under {@code namespace} (the mod id). */
+    public static synchronized void setRooftopRejectChance(String namespace, DoubleSupplier chance) {
+        Map<String, DoubleSupplier> next = new LinkedHashMap<>(rooftopByNamespace);
+        next.put(namespace, chance);
+        rooftopByNamespace = Collections.unmodifiableMap(next);
     }
 
     public static double rooftopRejectChance() {
         return rooftopRejectChance.getAsDouble();
     }
 
+    public static double rooftopRejectChance(@Nullable ResourceLocation typeId) {
+        DoubleSupplier chance = typeId == null ? null : rooftopByNamespace.get(typeId.getNamespace());
+        return (chance != null ? chance : rooftopRejectChance).getAsDouble();
+    }
+
     public static boolean hasAny() {
-        return !BY_TYPE.isEmpty();
+        return !byType.isEmpty();
     }
 
     public static Collection<MobSettingsSpec> all() {
-        return Collections.unmodifiableCollection(BY_TYPE.values());
+        return byType.values();
     }
 
     @Nullable
     public static MobSettingsSpec get(ResourceLocation typeId) {
-        return BY_TYPE.get(typeId);
+        return byType.get(typeId);
     }
 
     @Nullable
     public static MobSettingsSpec get(EntityType<?> type) {
         ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(type);
-        return key == null ? null : BY_TYPE.get(key);
+        return key == null ? null : byType.get(key);
     }
 
     public static boolean isEnabled(EntityType<?> type) {

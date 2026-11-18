@@ -67,12 +67,19 @@ repositories {
         name = "Illusive Soulworks"
         url = "https://maven.theillusivec4.top/"
     }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content { includeGroup "maven.modrinth" }
+    }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
+    // Optional Jade: merchant profession line (RatLibJadePlugin), loaded only when Jade is installed.
+    compileOnly fg.deobf("maven.modrinth:jade:11.13.2+forge")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 

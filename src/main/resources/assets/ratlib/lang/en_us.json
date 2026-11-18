@@ -3,5 +3,6 @@
   "screen.solconfig.empty": "No Solar mods with settings are installed.",
   "screen.solconfig.common_hint": "World/server settings. Dedicated servers use their own files.",
   "key.ratlib.open_config": "Open SolConfig",
-  "key.categories.solconfig": "SolConfig"
+  "key.categories.solconfig": "SolConfig",
+  "config.jade.plugin_ratlib.merchant_profession": "Merchant Profession"
 }

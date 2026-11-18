@@ -34,3 +34,11 @@ displayTest="IGNORE_ALL_VERSION"
     versionRange="[5.4,)"
     ordering="NONE"
     side="BOTH"
+
+# Optional Jade — profession line for ProfessionTrader merchants
+[[dependencies.${mod_id}]]
+    modId="jade"
+    mandatory=false
+    versionRange="[11.0,)"
+    ordering="NONE"
+    side="BOTH"

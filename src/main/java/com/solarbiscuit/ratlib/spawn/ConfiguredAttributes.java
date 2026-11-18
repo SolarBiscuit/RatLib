@@ -11,6 +11,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.util.RandomSource;
+import net.minecraftforge.registries.ForgeRegistries;
 
 public final class ConfiguredAttributes {
     private ConfiguredAttributes() {}
@@ -59,7 +60,7 @@ public final class ConfiguredAttributes {
         if (MobConfigs.isBiomeBanned(mob.getType(), level, pos)) {
             return false;
         }
-        return !StructureRooftop.shouldReject(level, pos, random);
+        return !StructureRooftop.shouldReject(level, pos, random, ForgeRegistries.ENTITY_TYPES.getKey(mob.getType()));
     }
 
     private static void setBase(LivingEntity entity, Attribute attribute, double value) {

@@ -9,6 +9,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.MobSpawnEvent;
@@ -18,17 +19,62 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = RatLib.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class SpawnConfigEvents {
-    private static SpawnPolicy policy = SpawnPolicy.NONE;
+    private static volatile SpawnPolicy fallback = SpawnPolicy.NONE;
+    private static volatile Map<String, SpawnPolicy> byNamespace = Map.of();
+    private static volatile List<SpawnExclusion> exclusions = List.of();
 
     private SpawnConfigEvents() {}
 
+    /**
+     * Policy for mobs whose mod has not registered its own. A second content mod calling this
+     * replaces the first one's policy, so use {@link #registerPolicy(String, SpawnPolicy)}.
+     */
+    @Deprecated
     public static void setPolicy(SpawnPolicy next) {
-        policy = next == null ? SpawnPolicy.NONE : next;
+        fallback = next == null ? SpawnPolicy.NONE : next;
+    }
+
+    /** Applies {@code policy} only to mobs registered under {@code namespace} (the mod id). */
+    public static synchronized void registerPolicy(String namespace, SpawnPolicy policy) {
+        Map<String, SpawnPolicy> next = new LinkedHashMap<>(byNamespace);
+        next.put(namespace, policy == null ? SpawnPolicy.NONE : policy);
+        byNamespace = Collections.unmodifiableMap(next);
+    }
+
+    /** Adds a natural-spawn rule checked for every configured mob, from any mod. */
+    public static synchronized void registerExclusion(SpawnExclusion exclusion) {
+        List<SpawnExclusion> next = new ArrayList<>(exclusions);
+        next.add(exclusion);
+        exclusions = Collections.unmodifiableList(next);
+    }
+
+    /** Whether a registered exclusion forbids {@code mob} spawning naturally at {@code pos}. */
+    public static boolean isExcluded(Mob mob, LevelAccessor level, BlockPos pos) {
+        for (SpawnExclusion exclusion : exclusions) {
+            if (exclusion.excludes(mob, level, pos)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static SpawnPolicy policyFor(@Nullable ResourceLocation typeId) {
+        SpawnPolicy policy = typeId == null ? null : byNamespace.get(typeId.getNamespace());
+        return policy != null ? policy : fallback;
+    }
+
+    private static SpawnPolicy policyFor(EntityType<?> type) {
+        return policyFor(ForgeRegistries.ENTITY_TYPES.getKey(type));
     }
 
     @SubscribeEvent
@@ -65,7 +111,7 @@ public final class SpawnConfigEvents {
             int min = data.minCount;
             int max = data.maxCount;
             ResourceLocation typeId = ForgeRegistries.ENTITY_TYPES.getKey(data.type);
-            if (typeId != null && policy.forceSoloGroup(typeId)) {
+            if (typeId != null && policyFor(typeId).forceSoloGroup(typeId)) {
                 min = 1;
                 max = 1;
             } else if (customGroups) {
@@ -86,7 +132,7 @@ public final class SpawnConfigEvents {
     private static void addWhitelistedSpawns(LevelEvent.PotentialSpawns event) {
         BlockPos pos = event.getPos();
         for (MobSettingsSpec settings : MobConfigs.all()) {
-            if (policy.skipWhitelist(settings.typeId)) {
+            if (policyFor(settings.typeId).skipWhitelist(settings.typeId)) {
                 continue;
             }
             List<String> whitelist = settings.whitelist();
@@ -130,7 +176,12 @@ public final class SpawnConfigEvents {
             event.setResult(Event.Result.DENY);
             return;
         }
-        if (policy.extraDenyPosition(mob, event)) {
+        if (!ConfiguredAttributes.isForcedSpawn(event.getSpawnType())
+                && isExcluded(mob, event.getLevel(), BlockPos.containing(event.getX(), event.getY(), event.getZ()))) {
+            event.setResult(Event.Result.DENY);
+            return;
+        }
+        if (policyFor(mob.getType()).extraDenyPosition(mob, event)) {
             event.setResult(Event.Result.DENY);
         }
     }
@@ -148,7 +199,7 @@ public final class SpawnConfigEvents {
         if (ConfiguredAttributes.isForcedSpawn(event.getSpawnType())) {
             return;
         }
-        if (policy.extraCancelFinalize(event)) {
+        if (policyFor(mob.getType()).extraCancelFinalize(event)) {
             event.setSpawnCancelled(true);
         }
     }

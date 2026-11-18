@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
+import java.util.UUID;
 import java.util.function.ToIntFunction;
 
 public final class CuriosCompat {
@@ -41,6 +42,34 @@ public final class CuriosCompat {
     public static void setStack(LivingEntity entity, String slotId, ItemStack stack) {
         if (isLoaded()) {
             CuriosAccess.setStack(entity, slotId, stack);
+        }
+    }
+
+    /** The stack in slot {@code index} of {@code slotId}; empty when the entity has no such slot. */
+    public static ItemStack getStackAt(LivingEntity entity, String slotId, int index) {
+        return isLoaded() ? CuriosAccess.getStackAt(entity, slotId, index) : ItemStack.EMPTY;
+    }
+
+    /** Sets slot {@code index} of {@code slotId}; does nothing when the entity has no such slot. */
+    public static void setStackAt(LivingEntity entity, String slotId, int index, ItemStack stack) {
+        if (isLoaded()) {
+            CuriosAccess.setStackAt(entity, slotId, index, stack);
+        }
+    }
+
+    /** How many {@code slotId} slots the entity has (0 without Curios or without that slot type). */
+    public static int slotCount(LivingEntity entity, String slotId) {
+        return isLoaded() ? CuriosAccess.slotCount(entity, slotId) : 0;
+    }
+
+    /**
+     * Server side: grows {@code slotId} to at least {@code size} slots with a permanent modifier
+     * ({@code modifierId} must be unique per mod and slot). Safe to call every tick; Curios applies
+     * the resize and syncs it on its next tick of the entity.
+     */
+    public static void ensureSlotCount(LivingEntity entity, String slotId, int size, UUID modifierId, String name) {
+        if (isLoaded() && entity != null && !entity.level().isClientSide) {
+            CuriosAccess.ensureSlotCount(entity, slotId, size, modifierId, name);
         }
     }
 

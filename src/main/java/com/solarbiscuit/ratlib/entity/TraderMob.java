@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -14,6 +15,9 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -53,7 +57,33 @@ public abstract class TraderMob extends AbstractVillager {
         if (event.getInteractionResult() != InteractionResult.PASS) {
             return event.getInteractionResult();
         }
+        InteractionResult trade = openTrades(player, hand);
+        if (trade != InteractionResult.PASS) {
+            return trade;
+        }
         return super.mobInteract(player, hand);
+    }
+
+    /**
+     * Opens the trade screen the way a wandering trader does. Runs when no {@link TraderMobInteractEvent}
+     * listener handled the click, e.g. without RatRep or for a trader with no faction.
+     */
+    protected InteractionResult openTrades(Player player, InteractionHand hand) {
+        ItemStack held = player.getItemInHand(hand);
+        if (!this.isAlive() || this.isTrading() || player.isSecondaryUseActive()
+                || held.is(Items.NAME_TAG) || held.getItem() instanceof SpawnEggItem) {
+            return InteractionResult.PASS;
+        }
+        if (!this.level().isClientSide) {
+            if (hand == InteractionHand.MAIN_HAND) {
+                player.awardStat(Stats.TALKED_TO_VILLAGER);
+            }
+            if (!this.getOffers().isEmpty()) {
+                this.setTradingPlayer(player);
+                this.openTradingScreen(player, this.getDisplayName(), 1);
+            }
+        }
+        return InteractionResult.sidedSuccess(this.level().isClientSide);
     }
 
     @Override
